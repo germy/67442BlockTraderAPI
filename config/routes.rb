@@ -3,14 +3,9 @@ Rails.application.routes.draw do
 
   get 'home/index'
 
-  post 'api/signup'
   post 'api/signin'
-  post 'api/reset_password'
 
-  post 'api/upload_photo'
-  get 'api/get_photos'
-  delete 'api/delete_photo'
-    
+  get 'api/index'
   get 'api/get_token'  
   get 'api/clear_token'
     

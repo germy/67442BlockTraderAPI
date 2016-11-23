@@ -1,58 +1,28 @@
+require 'net/http'
+require 'json'
+
 class ApiController < ApplicationController  
-  http_basic_authenticate_with name:ENV["API_AUTH_NAME"], password:ENV["API_AUTH_PASSWORD"], :only => [:signup, :signin, :get_token]  
-  before_filter :check_for_valid_authtoken, :except => [:signup, :signin, :get_token]
-  
-  def signup
-    if request.post?
-      if params && params[:full_name] && params[:email] && params[:password]
-        
-        params[:user] = Hash.new    
-        params[:user][:first_name] = params[:full_name].split(" ").first
-        params[:user][:last_name] = params[:full_name].split(" ").last
-        params[:user][:email] = params[:email]
-        
-        begin 
-          decrypted_pass = AESCrypt.decrypt(params[:password], ENV["API_AUTH_PASSWORD"])
-        rescue Exception => e
-          decrypted_pass = nil          
-        end
-                
-        params[:user][:password] = decrypted_pass  
-        params[:user][:verification_code] = rand_string(20)
-        
-        user = User.new(user_params)
+  before_filter :check_for_valid_authtoken, :except => [:signin, :get_token]
 
-        if user.save
-          render :json => user.to_json, :status => 200
-        else
-          error_str = ""
-
-          user.errors.each{|attr, msg|           
-            error_str += "#{attr} - #{msg},"
-          }
-                    
-          e = Error.new(:status => 400, :message => error_str)
-          render :json => e.to_json, :status => 400
-        end
-      else
-        e = Error.new(:status => 400, :message => "required parameters are missing")
-        render :json => e.to_json, :status => 400
-      end
-    end
+  def index
+    render :html => "congrats"
   end
-
+  
+  #this method simply recieves the first and last name, emaili and accesstoken
+  #after verifying the accesstoken, it either creates a new account or signs in 
+  #an existing user; either case passes back a token
+  
   def signin
+    puts params
     if request.post?
-      if params && params[:email] && params[:password]        
-        user = User.where(:email => params[:email]).first
-                      
+
+      if params && params[:email] && params[:accessToken]   
+        user = User.where(:email => params[:email]).first           
         if user 
-          if User.authenticate(params[:email], params[:password]) 
-                    
+          if User.authenticate(params[:email]) && check_fb_accesstoken(params[:accessToken], params[:fb_id])
             if !user.api_authtoken || (user.api_authtoken && user.authtoken_expiry < Time.now)
               auth_token = rand_string(20)
               auth_expiry = Time.now + (24*60*60)
-          
               user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)    
             end 
                                    
@@ -62,50 +32,20 @@ class ApiController < ApplicationController
             render :json => e.to_json, :status => 401
           end      
         else
-          e = Error.new(:status => 400, :message => "No USER found by this email ID")
-          render :json => e.to_json, :status => 400
-        end
-      else
-        e = Error.new(:status => 400, :message => "required parameters are missing")
-        render :json => e.to_json, :status => 400
-      end
-    end
-  end
-  
-  def reset_password
-    if request.post?
-      if params && params[:old_password] && params[:new_password]         
-        if @user         
-          if @user.authtoken_expiry > Time.now
-            authenticate_user = User.authenticate(@user.email, params[:old_password])
-                        
-            if authenticate_user && !authenticate_user.nil?             
-              auth_token = rand_string(20)
-              auth_expiry = Time.now + (24*60*60)
-            
-              begin
-                new_password = AESCrypt.decrypt(params[:new_password], ENV["API_AUTH_PASSWORD"])  
-              rescue Exception => e
-                new_password = nil
-                puts "error - #{e.message}"
-              end
-              
-              new_password_salt = BCrypt::Engine.generate_salt
-              new_password_digest = BCrypt::Engine.hash_secret(new_password, new_password_salt)
-                              
-              @user.update_attributes(:password => new_password, :api_authtoken => auth_token, :authtoken_expiry => auth_expiry, :password_salt => new_password_salt, :password_hash => new_password_digest)
-              render :json => @user.to_json, :status => 200           
-            else
-              e = Error.new(:status => 401, :message => "Wrong Password")
-              render :json => e.to_json, :status => 401
-            end
-          else
-            e = Error.new(:status => 401, :message => "Authtoken is invalid or has expired. Kindly refresh the token and try again!")
-            render :json => e.to_json, :status => 401
+          params[:user] = Hash.new    
+          params[:user][:first_name] = params[:name].split(" ").first
+          params[:user][:last_name] = params[:name].split(" ").last
+          params[:user][:email] = params[:email]
+          params[:user][:fb_id] = params[:fb_id]
+          if check_fb_accesstoken(params[:accessToken], params[:fb_id]) == false
+            e = Error.new(:status => 400, :message => "facebook token cannot be verified")
+            render :json => e.to_json, :status => 400
           end
-        else
-          e = Error.new(:status => 400, :message => "No user record found for this email ID")
-          render :json => e.to_json, :status => 400
+          user = User.new(user_params)
+          auth_token = rand_string(20)
+          auth_expiry = Time.now + (24*60*60)
+          user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)  
+          render :json => user.to_json, :status => 200
         end
       else
         e = Error.new(:status => 400, :message => "required parameters are missing")
@@ -149,111 +89,29 @@ class ApiController < ApplicationController
       render :json => e.to_json, :status => 401
     end 
   end
-  
-  def upload_photo
-    if request.post?
-      if params[:title] && params[:image]          
-        if @user && @user.authtoken_expiry > Time.now
-          rand_id = rand_string(40)
-          image_name = params[:image].original_filename
-          image = params[:image].read     
-                    
-          s3 = AWS::S3.new
-            
-          if s3
-            bucket = s3.buckets[ENV["S3_BUCKET_NAME"]]
-              
-            if !bucket
-              bucket = s3.buckets.create(ENV["S3_BUCKET_NAME"])
-            end
-              
-            s3_obj = bucket.objects[rand_id]
-            s3_obj.write(image, :acl => :public_read)
-            image_url = s3_obj.public_url.to_s
-                                                    
-            photo = Photo.new(:name => image_name, :user_id => @user.id, :title => params[:title], :image_url => image_url, :random_id => rand_id)
-          
-            if photo.save
-              render :json => photo.to_json
-            else
-              error_str = ""
-
-              photo.errors.each{|attr, msg|           
-                error_str += "#{attr} - #{msg},"
-              }
-                    
-              e = Error.new(:status => 400, :message => error_str)
-              render :json => e.to_json, :status => 400
-            end
-          else
-            e = Error.new(:status => 401, :message => "AWS S3 signature is wrong")
-            render :json => e.to_json, :status => 401              
-          end
-        else
-          e = Error.new(:status => 401, :message => "Authtoken has expired")
-          render :json => e.to_json, :status => 401
-        end
-      else
-        e = Error.new(:status => 400, :message => "required parameters are missing")
-        render :json => e.to_json, :status => 400
-      end
-    end
-  end
-
-  def delete_photo
-    if request.delete?
-      if params[:photo_id]          
-        if @user && @user.authtoken_expiry > Time.now
-          photo = Photo.where(:random_id => params[:photo_id]).first
-          
-          if photo && photo.user_id == @user.id            
-            s3 = AWS::S3.new
-            
-            if s3
-              bucket = s3.buckets[ENV["S3_BUCKET_NAME"]]
-              s3_obj =  bucket.objects[photo.random_id]
-              s3_obj.delete
-                            
-              photo.destroy
-            
-              m = Message.new(:status => 200, :message => "Image deleted")          
-              render :json => m.to_json, :status => 200  
-            else
-              e = Error.new(:status => 401, :message => "AWS S3 signature is wrong")
-              render :json => e.to_json, :status => 401        
-            end                        
-          else
-            e = Error.new(:status => 401, :message => "Invalid Photo ID or You don't have permission to delete this photo!")
-            render :json => e.to_json, :status => 401
-          end
-        else
-          e = Error.new(:status => 401, :message => "Authtoken has expired. Please get a new token and try again!")
-          render :json => e.to_json, :status => 401
-        end
-      else
-        e = Error.new(:status => 400, :message => "required parameters are missing")
-        render :json => e.to_json, :status => 400
-      end
-    end
-  end
-
-  def get_photos    
-    if @user && @user.authtoken_expiry > Time.now
-      photos = @user.photos
-      render :json => photos.to_json, :status => 200
-    else
-      e = Error.new(:status => 401, :message => "Authtoken has expired. Please get a new token and try again!")
-      render :json => e.to_json, :status => 401
-    end
-  end
 
   private 
+  
+  def check_fb_accesstoken(token, id)
+    url_ = 'https://graph.facebook.com/me?access_token=' + token.to_s
+    result = Net::HTTP.get(URI.parse(url_.to_s))
+    json = JSON.parse(result)
+    if(json["id"].to_s == id.to_s)
+      return true
+    end
+    return false
+  end
   
   def check_for_valid_authtoken
     authenticate_or_request_with_http_token do |token, options|     
       @user = User.where(:api_authtoken => token).first      
     end
   end
+  
+  #send token in header (get request)
+  #GET /episodes HTTP/1.1
+  #Host: localhost:3000
+  #Authorization: Token token=123123123
   
   def rand_string(len)
     o =  [('a'..'z'),('A'..'Z')].map{|i| i.to_a}.flatten
@@ -263,12 +121,9 @@ class ApiController < ApplicationController
   end
   
   def user_params
-    params.require(:user).permit(:first_name, :last_name, :email, :password, :password_hash, :password_salt, :verification_code, 
-    :email_verification, :api_authtoken, :authtoken_expiry)
+    params.require(:user).permit(:first_name, :last_name, :fb_id, :email, :accessToken,
+     :api_authtoken, :authtoken_expiry)
   end
-  
-  def photo_params
-    params.require(:photo).permit(:name, :title, :user_id, :random_id, :image_url)
-  end
+ 
     
 end
