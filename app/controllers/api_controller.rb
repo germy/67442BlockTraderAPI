@@ -23,7 +23,7 @@ class ApiController < ApplicationController
             if !user.api_authtoken || (user.api_authtoken && user.authtoken_expiry < Time.now)
               auth_token = rand_string(20)
               auth_expiry = Time.now + (24*60*60)
-              user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)    
+              user.update_attributes(:api_authtoken => auth_token, :authtoken_expiry => auth_expiry)   
             end 
                                    
             render :json => user.to_json, :status => 200
