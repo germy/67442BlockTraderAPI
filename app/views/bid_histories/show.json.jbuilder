@@ -1,0 +1,1 @@
+json.partial! "bid_histories/bid_history", bid_history: @bid_history

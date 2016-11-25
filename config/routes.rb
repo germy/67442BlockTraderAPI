@@ -1,4 +1,14 @@
 Rails.application.routes.draw do
+  resources :bid_histories
+
+  resources :orders
+
+  resources :food_orders
+
+  resources :restaurants
+
+  resources :foods
+
   root 'home#index'
 
   get 'home/index'

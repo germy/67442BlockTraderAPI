@@ -1,0 +1,2 @@
+json.extract! order, :id, :food_order_id, :customer_id, :provider_id, :address, :latitude, :longitude, :delivery_status, :payment_id_user, :payment_id_receiever, :created_at, :updated_at
+json.url order_url(order, format: :json)

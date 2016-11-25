@@ -1,0 +1,23 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  food_order_id: 1
+  customer_id: 1
+  provider_id: 1
+  address: MyString
+  latitude: 9.99
+  longitude: 9.99
+  delivery_status: MyString
+  payment_id_user: MyString
+  payment_id_receiever: MyString
+
+two:
+  food_order_id: 1
+  customer_id: 1
+  provider_id: 1
+  address: MyString
+  latitude: 9.99
+  longitude: 9.99
+  delivery_status: MyString
+  payment_id_user: MyString
+  payment_id_receiever: MyString

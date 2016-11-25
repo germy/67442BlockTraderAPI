@@ -1,0 +1,49 @@
+<p id="notice"><%= notice %></p>
+
+<p>
+  <strong>Food order:</strong>
+  <%= @order.food_order_id %>
+</p>
+
+<p>
+  <strong>Customer:</strong>
+  <%= @order.customer_id %>
+</p>
+
+<p>
+  <strong>Provider:</strong>
+  <%= @order.provider_id %>
+</p>
+
+<p>
+  <strong>Address:</strong>
+  <%= @order.address %>
+</p>
+
+<p>
+  <strong>Latitude:</strong>
+  <%= @order.latitude %>
+</p>
+
+<p>
+  <strong>Longitude:</strong>
+  <%= @order.longitude %>
+</p>
+
+<p>
+  <strong>Delivery status:</strong>
+  <%= @order.delivery_status %>
+</p>
+
+<p>
+  <strong>Payment id user:</strong>
+  <%= @order.payment_id_user %>
+</p>
+
+<p>
+  <strong>Payment id receiever:</strong>
+  <%= @order.payment_id_receiever %>
+</p>
+
+<%= link_to 'Edit', edit_order_path(@order) %> |
+<%= link_to 'Back', orders_path %>
