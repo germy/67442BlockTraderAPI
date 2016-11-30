@@ -24,7 +24,7 @@ class RestaurantsController < ApplicationController
   # POST /restaurants
   # POST /restaurants.json
   def create
-    @restaurant = restaurant.new(restaurant_params)
+    @restaurant = Restaurant.new(restaurant_params)
 
     respond_to do |format|
       if @restaurant.save
@@ -64,7 +64,7 @@ class RestaurantsController < ApplicationController
   private
     # Use callbacks to share common setup or constraints between actions.
     def set_restaurant
-      @restaurant = restaurant.find(params[:id])
+      @restaurant = Restaurant.find(params[:id])
     end
 
     # Never trust parameters from the scary internet, only allow the white list through.
