@@ -4,7 +4,12 @@ class RestaurantsController < ApplicationController
   # GET /restaurants
   # GET /restaurants.json
   def index
-    @restaurants = Restaurant.all
+    rest = params[:rest_id]
+    if(rest)
+      @restaurants = Restaurant.where("id = ?", rest)
+    else
+      @restaurants = Restaurant.order(:id)
+    end
   end
 
   # GET /restaurants/1

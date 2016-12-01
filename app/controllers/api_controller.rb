@@ -2,7 +2,7 @@ require 'net/http'
 require 'json'
 
 class ApiController < ApplicationController  
-  #before_filter :check_for_valid_authtoken, :except => [:signin, :get_token]
+  before_filter :check_for_valid_authtoken, :except => [:signin, :get_token]
 
   def index
     render :html => "congrats"
